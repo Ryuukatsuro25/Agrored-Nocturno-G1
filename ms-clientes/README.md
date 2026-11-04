@@ -1,42 +1,122 @@
-# ms-clientes · AgroRed S.A. (Módulo 3, Taller 1)
+# ms-clientes · AgroRed S.A.S.
 
-Redes y Servicios Multimedia · UAO · Microservicio de **clientes** de la aplicación de AgroRed,
-con **Node.js + Express** organizado en capas. Adaptado de la plantilla entregada por la docente.
+Microservicio de **clientes** de la aplicación de AgroRed: gestiona los distribuidores y comercios que le compran a AgroRed.
+Responsable: **Juan José Osorio Reyes** · Puerto: **3003** · Base de datos propia: `clientes_db` (MySQL).
 
-Versión del Taller 1: datos en memoria y tres operaciones (listar, obtener, crear).
-En el Taller 2 se agregan PUT y DELETE y el repositorio pasa a MySQL.
+Construido con Node.js + Express en capas (rutas → controlador → servicio → repositorio → modelo). Versión del Taller 2: CRUD completo, filtros, persistencia en MySQL y seguridad con JWT.
 
 ## Cómo ejecutarlo
 
-Requisitos: Node.js LTS 22 (22.9 o superior).
+Requisitos: Node.js 22.9 o superior y MySQL 8 (o MariaDB).
+
+**1. Crear la base de datos y su usuario** (una sola vez, conectado como `root` en MySQL Workbench o en la consola `mysql -u root -p`):
+
+```sql
+CREATE DATABASE clientes_db;
+CREATE USER 'clientes_user'@'localhost' IDENTIFIED BY 'una-clave-segura';
+GRANT ALL PRIVILEGES ON clientes_db.* TO 'clientes_user'@'localhost';
+```
+
+**2. Crear la tabla y los registros iniciales** (desde la carpeta `ms-clientes`):
 
 ```
-npm install                 # descarga Express en node_modules
-copy .env.example .env      # en Windows (en Linux/Mac: cp .env.example .env)
-npm run dev                 # inicia en http://127.0.0.1:3003 y se reinicia al guardar
+mysql -u clientes_user -p clientes_db
+mysql> SOURCE db/schema.sql;
 ```
 
-## Capas
+**3. Configurar e iniciar el servicio:**
 
-| Archivo | Capa | Responsabilidad |
+```
+npm install
+copy .env.example .env      # en Linux/Mac: cp .env.example .env
+npm run dev
+```
+
+Variables del `.env` (el archivo nunca se sube al repositorio):
+
+| Variable | Ejemplo | Para qué |
 |---|---|---|
-| src/index.js | Arranque | Lee PORT y HOST y pone el servidor a escuchar |
-| src/app.js | Configuración | Middlewares, /health, montaje de rutas, manejo de errores |
-| src/routes/clientes.routes.js | Presentación | Método HTTP + URI → función del controlador |
-| src/controllers/clientes.controller.js | Presentación | Lee la petición, llama al servicio, arma la respuesta |
-| src/services/clientes.service.js | Lógica de negocio | Validaciones y reglas; no conoce HTTP ni la base de datos |
-| src/repositories/clientes.repository.js | Acceso a datos | Guarda y consulta (en memoria en el Taller 1) |
-| src/models/cliente.js | Modelo | Atributos de la entidad y su validación |
-| src/utils/http-error.js | Utilidad | Error con código de estado HTTP |
+| PORT | 3003 | Puerto del microservicio |
+| HOST | 127.0.0.1 | Solo acepta conexiones del mismo equipo |
+| DB_HOST / DB_PORT | localhost / 3306 | Dónde está MySQL (en el Taller 3: la IP de servidor1) |
+| DB_NAME / DB_USER / DB_PASSWORD | clientes_db / clientes_user / … | Base y usuario propios del microservicio |
+| JWT_SECRET | (frase del grupo) | La misma en todos los microservicios; verifica los tokens |
 
-## Endpoints (Taller 1)
+Verificar: `http://localhost:3003/health` responde `{"servicio":"ms-clientes","estado":"ok"}`. Las demás rutas exigen un token de ms-usuarios.
 
-| Método | URI | Respuesta |
+## Representación
+
+Así responde `GET /clientes/1`:
+
+```json
+{ "id": 1, "nombre": "Distribuidora El Valle", "nit": "900123456-7", "ciudad": "Cali", "telefono": "6023334455", "tipo": "distribuidor" }
+```
+
+| Atributo | Tipo | ¿Obligatorio al crear? | Reglas |
+|---|---|---|---|
+| id | entero | No: lo asigna el servicio | Positivo y único |
+| nombre | texto | Sí | No vacío |
+| nit | texto | Sí | Formato 900123456-7; único (409) |
+| ciudad | texto | Sí | No vacía |
+| telefono | texto | Sí | Solo dígitos, de 7 a 10 |
+| tipo | texto | Sí | distribuidor o comercio |
+
+**Regla de negocio:** El NIT identifica a la empresa cliente ante la DIAN: no puede repetirse (409). Además: formato del NIT, teléfono de 7 a 10 dígitos y tipo dentro de su lista (400).
+
+## Endpoints
+
+Todas las rutas (salvo `/health`) exigen la cabecera `Authorization: Bearer <token>`.
+
+| Operación | Método | URI | Cuerpo | Respuesta exitosa | Errores posibles |
+|---|---|---|---|---|---|
+| Listar | GET | /clientes | — | 200 + arreglo | 401 |
+| Filtrar | GET | /clientes?tipo=comercio | — | 200 + arreglo filtrado | 400 · 401 |
+| Consultar por lotes | GET | /clientes?ids=1,3,8 | — | 200 + arreglo con esos registros | 400 ids inválidos · 401 |
+| Obtener | GET | /clientes/:id | — | 200 + objeto | 400 id inválido · 401 · 404 |
+| Crear | POST | /clientes | JSON sin id | 201 + objeto + cabecera Location | 400 · 401 · 403 · 409 NIT repetido |
+| Actualizar | PUT | /clientes/:id | JSON completo sin id | 200 + objeto actualizado | 400 · 401 · 403 · 404 · 409 |
+| Eliminar | DELETE | /clientes/:id | — | 204 sin cuerpo | 400 · 401 · 403 · 404 |
+
+Ejemplo · crear:
+
+```
+POST /clientes
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "nombre": "Frutas del Pacífico", "nit": "901555222-4", "ciudad": "Buenaventura", "telefono": "3154442211", "tipo": "distribuidor" }
+
+→ 201 Created · Location: /clientes/4
+{ "id": 4, "nombre": "Frutas del Pacífico", "nit": "901555222-4", "ciudad": "Buenaventura", "telefono": "3154442211", "tipo": "distribuidor" }
+```
+
+Ejemplo · listar con filtro:
+
+```
+GET /clientes?tipo=comercio
+→ 200 OK · arreglo con los registros que cumplen el filtro
+```
+
+Errores: siempre `{"error": "...", "detalles": [...]}` (detalles solo en validación).
+
+## Seguridad
+
+| Entidad | Consultan (GET) | Crean, modifican y eliminan |
 |---|---|---|
-| GET | /health | 200 `{"servicio":"ms-clientes","estado":"ok"}` |
-| GET | /clientes | 200 arreglo de clientes |
-| GET | /clientes/:id | 200 registro · 400 id inválido · 404 no existe |
-| POST | /clientes | 201 registro creado + cabecera Location · 400 datos inválidos · 409 NIT repetido |
+| Clientes | administrador, comercial, produccion | administrador, comercial |
 
-Ejemplo de cuerpo para POST:
-`{"nombre": "Frutas del Pacífico", "nit": "901555222-4", "ciudad": "Buenaventura", "telefono": "3154442211", "tipo": "distribuidor"}`
+Sin token o con un token inválido: 401. Con un rol sin permiso: 403.
+
+## Relaciones
+
+ms-clientes no guarda referencias. **Es consultado** por ms-pedidos:
+
+| Me consulta | Peticiones que me hace | Campos que no puedo cambiar sin avisar |
+|---|---|---|
+| ms-pedidos | GET /clientes/:id · GET /clientes?ids=… | id, nombre |
+
+Por eso el filtro `?ids=` es parte de este contrato. Cada petición que llega se registra en la terminal del servicio.
+
+## Pruebas
+
+Colección de Postman en `docs/ms-clientes.postman_collection.json` (Import en Postman). Ejecute primero la carpeta 0 (inicio de sesión) con ms-usuarios corriendo.
