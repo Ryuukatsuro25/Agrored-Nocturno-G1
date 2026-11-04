@@ -1,46 +1,128 @@
-# ms-pedidos · AgroRed S.A. (Módulo 3, Taller 1)
+# ms-pedidos · AgroRed S.A.S.
 
-Redes y Servicios Multimedia · UAO · Microservicio de **pedidos** de la aplicación de AgroRed,
-con **Node.js + Express** organizado en capas. Adaptado de la plantilla entregada por la docente.
+Microservicio de **pedidos** de la aplicación de AgroRed: gestiona los pedidos de los clientes: qué producto, cuánto y desde qué centro de distribución.
+Responsable: **Valeria Polanco Muñoz** · Puerto: **3004** · Base de datos propia: `pedidos_db` (MySQL).
 
-Versión del Taller 1: datos en memoria y tres operaciones (listar, obtener, crear).
-En el Taller 2 se agregan PUT y DELETE y el repositorio pasa a MySQL.
+Construido con Node.js + Express en capas (rutas → controlador → servicio → repositorio → modelo). Versión del Taller 2: CRUD completo, filtros, persistencia en MySQL y seguridad con JWT, más las relaciones con ms-clientes y ms-productos.
 
 ## Cómo ejecutarlo
 
-Requisitos: Node.js LTS 22 (22.9 o superior).
+Requisitos: Node.js 22.9 o superior y MySQL 8 (o MariaDB).
+
+**1. Crear la base de datos y su usuario** (una sola vez, conectado como `root` en MySQL Workbench o en la consola `mysql -u root -p`):
+
+```sql
+CREATE DATABASE pedidos_db;
+CREATE USER 'pedidos_user'@'localhost' IDENTIFIED BY 'una-clave-segura';
+GRANT ALL PRIVILEGES ON pedidos_db.* TO 'pedidos_user'@'localhost';
+```
+
+**2. Crear la tabla y los registros iniciales** (desde la carpeta `ms-pedidos`):
 
 ```
-npm install                 # descarga Express en node_modules
-copy .env.example .env      # en Windows (en Linux/Mac: cp .env.example .env)
-npm run dev                 # inicia en http://127.0.0.1:3004 y se reinicia al guardar
+mysql -u pedidos_user -p pedidos_db
+mysql> SOURCE db/schema.sql;
 ```
 
-## Capas
+**3. Configurar e iniciar el servicio:**
 
-| Archivo | Capa | Responsabilidad |
+```
+npm install
+copy .env.example .env      # en Linux/Mac: cp .env.example .env
+npm run dev
+```
+
+Variables del `.env` (el archivo nunca se sube al repositorio):
+
+| Variable | Ejemplo | Para qué |
 |---|---|---|
-| src/index.js | Arranque | Lee PORT y HOST y pone el servidor a escuchar |
-| src/app.js | Configuración | Middlewares, /health, montaje de rutas, manejo de errores |
-| src/routes/pedidos.routes.js | Presentación | Método HTTP + URI → función del controlador |
-| src/controllers/pedidos.controller.js | Presentación | Lee la petición, llama al servicio, arma la respuesta |
-| src/services/pedidos.service.js | Lógica de negocio | Validaciones y reglas; no conoce HTTP ni la base de datos |
-| src/repositories/pedidos.repository.js | Acceso a datos | Guarda y consulta (en memoria en el Taller 1) |
-| src/models/pedido.js | Modelo | Atributos de la entidad y su validación |
-| src/utils/http-error.js | Utilidad | Error con código de estado HTTP |
+| PORT | 3004 | Puerto del microservicio |
+| HOST | 127.0.0.1 | Solo acepta conexiones del mismo equipo |
+| DB_HOST / DB_PORT | localhost / 3306 | Dónde está MySQL (en el Taller 3: la IP de servidor1) |
+| DB_NAME / DB_USER / DB_PASSWORD | pedidos_db / pedidos_user / … | Base y usuario propios del microservicio |
+| JWT_SECRET | (frase del grupo) | La misma en todos los microservicios; verifica los tokens |
+| CLIENTES_URL | http://127.0.0.1:3003 | Dónde está ms-clientes |
+| PRODUCTOS_URL | http://127.0.0.1:3002 | Dónde está ms-productos |
 
-## Endpoints (Taller 1)
+Verificar: `http://localhost:3004/health` responde `{"servicio":"ms-pedidos","estado":"ok"}`. Las demás rutas exigen un token de ms-usuarios.
 
-| Método | URI | Respuesta |
+## Representación
+
+Así responde `GET /pedidos/2`:
+
+```json
+{ "id": 2, "cliente_id": 2, "producto_id": 2, "cantidad": 80, "centro_distribucion": "Bogotá", "estado": "recibido", "fecha": "2026-10-26",
+  "cliente": { "id": 2, "nombre": "Fruver La Sabana" },
+  "producto": { "id": 2, "nombre": "Tomate chonto", "precio": 3200 } }
+```
+
+| Atributo | Tipo | ¿Obligatorio al crear? | Reglas |
+|---|---|---|---|
+| id | entero | No: lo asigna el servicio | Positivo y único |
+| cliente_id | entero | Sí | Debe existir en ms-clientes (400 si no; 503 si no responde) |
+| producto_id | entero | Sí | Debe existir en ms-productos (400 si no; 503 si no responde) |
+| cantidad | entero | Sí | Mayor que 0 |
+| centro_distribucion | texto | Sí | Bogotá o Cali |
+| estado | texto | Al crear no (siempre recibido); en PUT sí | recibido, despachado o entregado |
+| fecha | fecha AAAA-MM-DD | Al crear no (hoy); en PUT sí | Fecha válida |
+
+**Regla de negocio:** Todo pedido nuevo empieza en estado recibido (400 si llega otro) y sin fecha se registra con la de hoy; un pedido ya entregado no se puede modificar (409). Además: cantidad entera > 0 y centro de distribución dentro de su lista (400).
+
+## Endpoints
+
+Todas las rutas (salvo `/health`) exigen la cabecera `Authorization: Bearer <token>`.
+
+| Operación | Método | URI | Cuerpo | Respuesta exitosa | Errores posibles |
+|---|---|---|---|---|---|
+| Listar | GET | /pedidos | — | 200 + arreglo | 401 |
+| Filtrar | GET | /pedidos?estado=recibido | — | 200 + arreglo filtrado | 400 · 401 |
+| Obtener | GET | /pedidos/:id | — | 200 + objeto | 400 id inválido · 401 · 404 |
+| Crear | POST | /pedidos | JSON sin id | 201 + objeto + cabecera Location | 400 · 401 · 403 · 503 |
+| Actualizar | PUT | /pedidos/:id | JSON completo sin id | 200 + objeto actualizado | 400 · 401 · 403 · 404 · 409 · 503 |
+| Eliminar | DELETE | /pedidos/:id | — | 204 sin cuerpo | 400 · 401 · 403 · 404 |
+
+Ejemplo · crear:
+
+```
+POST /pedidos
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "cliente_id": 1, "producto_id": 2, "cantidad": 50, "centro_distribucion": "Cali" }
+
+→ 201 Created · Location: /pedidos/4
+{ "id": 4, "cliente_id": 1, "producto_id": 2, "cantidad": 50, "centro_distribucion": "Cali", "estado": "recibido", "fecha": "2026-11-03",
+  "cliente": { "id": 1, "nombre": "Distribuidora El Valle" }, "producto": { "id": 2, "nombre": "Tomate chonto", "precio": 3200 } }
+```
+
+Ejemplo · listar con filtro:
+
+```
+GET /pedidos?estado=recibido
+→ 200 OK · arreglo con los registros que cumplen el filtro
+```
+
+Errores: siempre `{"error": "...", "detalles": [...]}` (detalles solo en validación).
+
+## Seguridad
+
+| Entidad | Consultan (GET) | Crean, modifican y eliminan |
 |---|---|---|
-| GET | /health | 200 `{"servicio":"ms-pedidos","estado":"ok"}` |
-| GET | /pedidos | 200 arreglo de pedidos |
-| GET | /pedidos/:id | 200 registro · 400 id inválido · 404 no existe |
-| POST | /pedidos | 201 registro creado + cabecera Location · 400 datos inválidos o estado distinto de recibido |
+| Pedidos | administrador, comercial, produccion | administrador, comercial |
 
-Ejemplo de cuerpo para POST:
-`{"cliente_id": 1, "producto_id": 2, "cantidad": 50, "centro_distribucion": "Cali"}`
+Sin token o con un token inválido: 401. Con un rol sin permiso: 403.
 
-Reglas de negocio: todo pedido nuevo empieza en estado `recibido` y, si no se envía `fecha`,
-se registra con la fecha de hoy. `cliente_id` y `producto_id` son referencias a ms-clientes
-y ms-productos; en el Taller 3 se validan y se componen consultando esos microservicios.
+## Relaciones
+
+ms-pedidos **guarda las referencias** y consulta a los otros dos microservicios, reenviando el token del usuario:
+
+| Atributo | Microservicio consultado | Para validar (al crear y actualizar) | Para componer (al consultar) | Datos que usa |
+|---|---|---|---|---|
+| cliente_id | ms-clientes | GET /clientes/:id | GET /clientes?ids=… | id, nombre |
+| producto_id | ms-productos | GET /productos/:id | GET /productos?ids=… | id, nombre, precio |
+
+Si la referencia no existe: 400. Si el otro microservicio no responde al escribir: 503; al leer, la respuesta sale con el objeto en `null` y un `aviso` (degradación controlada). Para un listado se hace **una sola** consulta por lotes a cada microservicio. El código está en `src/clients/`.
+
+## Pruebas
+
+Colección de Postman en `docs/ms-pedidos.postman_collection.json` (Import en Postman). Ejecute primero la carpeta 0 (inicio de sesión) con ms-usuarios corriendo.
