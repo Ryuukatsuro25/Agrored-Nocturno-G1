@@ -7,8 +7,8 @@ const repo = require('../repositories/productos.repository');
 const { validarProducto, construirProducto } = require('../models/producto');
 const HttpError = require('../utils/http-error');
 
-async function listar() {
-  return repo.findAll();
+async function listar(filtros) {
+  return repo.findAll(filtros);
 }
 
 async function obtener(id) {
@@ -17,19 +17,37 @@ async function obtener(id) {
   return producto;
 }
 
+// Regla de negocio: el catálogo no puede tener dos productos con el mismo
+// nombre, sin importar mayúsculas (409 = Conflict). Los pedidos y los
+// reportes identifican el producto por su nombre.
+async function verificarNombreUnico(nombre, idActual = null) {
+  const existente = await repo.findByNombre(nombre);
+  if (existente && existente.id !== idActual) {
+    throw new HttpError(409, `Ya existe un producto con el nombre ${nombre}`);
+  }
+}
+
 async function crear(datos) {
   const errores = validarProducto(datos);
   if (errores.length > 0) throw new HttpError(400, 'Datos inválidos', errores);
-
   const producto = construirProducto(datos);
-
-  // Regla de negocio: el catálogo no puede tener dos productos con el mismo
-  // nombre (los pedidos y los reportes se leen por nombre). 409 = Conflict.
-  if (await repo.findByNombre(producto.nombre)) {
-    throw new HttpError(409, `Ya existe un producto con el nombre ${producto.nombre}`);
-  }
-
+  await verificarNombreUnico(producto.nombre);
   return repo.create(producto);
 }
 
-module.exports = { listar, obtener, crear };
+// PUT reemplaza el registro completo: se valida igual que al crear
+async function actualizar(id, datos) {
+  await obtener(id);                                   // 404 si no existe
+  const errores = validarProducto(datos);
+  if (errores.length > 0) throw new HttpError(400, 'Datos inválidos', errores);
+  const producto = construirProducto(datos);
+  await verificarNombreUnico(producto.nombre, id);
+  return repo.update(id, producto);
+}
+
+async function eliminar(id) {
+  const borrado = await repo.remove(id);
+  if (!borrado) throw new HttpError(404, `No existe el producto con id ${id}`);
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar };
