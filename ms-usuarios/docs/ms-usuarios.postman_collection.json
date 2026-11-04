@@ -1,0 +1,331 @@
+{
+  "info": {
+    "name": "ms-usuarios",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://localhost:3001"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 · Listar todos → 200",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base}}/usuarios"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 · Filtrar por rol → 200",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base}}/usuarios?rol=administrador"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 · Consultar por lotes → 200",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base}}/usuarios?ids=1,3"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 · Obtener existente → 200",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base}}/usuarios/2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 · Obtener inexistente → 404",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base}}/usuarios/99"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 · Obtener con id no numérico → 400",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base}}/usuarios/abc"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 · Crear válido → 201",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base}}/usuarios",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Marta Ríos\",\n  \"email\": \"marta.rios@empresa.com\",\n  \"rol\": \"despacho\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 · Crear sin datos obligatorios → 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base}}/usuarios",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 · Crear con email repetido → 409",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base}}/usuarios",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Otra Persona\",\n  \"email\": \"admin@empresa.com\",\n  \"rol\": \"flota\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 409\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 · Actualizar existente → 200",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base}}/usuarios/2",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Laura Gómez\",\n  \"email\": \"laura.gomez@empresa.com\",\n  \"rol\": \"despacho\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 · Actualizar inexistente → 404",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base}}/usuarios/99",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Nadie\",\n  \"email\": \"nadie@empresa.com\",\n  \"rol\": \"flota\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 · Eliminar existente → 204",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base}}/usuarios/3"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 204\", function () { pm.expect(pm.response.code).to.be.oneOf([204]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 · Eliminar otra vez → 404",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base}}/usuarios/3"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Responde 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
