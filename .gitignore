@@ -1,0 +1,8 @@
+node_modules/
+.env
+.vscode/
+*.log
+iniciar-todo.js
+iniciar.cmd
+probar-conexion.js
+crear-bases.js
