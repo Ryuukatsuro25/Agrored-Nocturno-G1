@@ -1,22 +1,18 @@
 // =====================================================================
-// CAPA DE PRESENTACIÓN (rutas)
-// Asocia cada método HTTP + URI con una función del controlador y aplica
-// la tabla de permisos del Taller 1 para Clientes:
-//   consultan (GET): cualquier usuario autenticado
-//   crean, modifican y eliminan: administrador y comercial
+// CAPA DE PRESENTACIÓN (rutas) · Taller 2, semana 1
+// Asocia cada método HTTP + URI con una función del controlador.
+// La autenticación JWT se incorporará en la semana 2 cuando la docente
+// entregue la versión de ms-usuarios con auth.js.
 // =====================================================================
 const { Router } = require('express');
 const controller = require('../controllers/clientes.controller');
-const { verificarToken, requiereRol } = require('../middlewares/auth');
 
 const router = Router();
 
-router.use(verificarToken);                                                          // todas exigen token (401)
-
-router.get('/', controller.listar);                                                  // listar, filtrar, ?ids=
-router.get('/:id', controller.obtener);                                              // obtener por id
-router.post('/', requiereRol('administrador', 'comercial'), controller.crear);       // crear (403 otros roles)
-router.put('/:id', requiereRol('administrador', 'comercial'), controller.actualizar);
-router.delete('/:id', requiereRol('administrador', 'comercial'), controller.eliminar);
+router.get('/', controller.listar);              // listar, filtrar, ?ids=
+router.get('/:id', controller.obtener);          // obtener por id
+router.post('/', controller.crear);              // crear
+router.put('/:id', controller.actualizar);       // actualizar
+router.delete('/:id', controller.eliminar);      // eliminar
 
 module.exports = router;
