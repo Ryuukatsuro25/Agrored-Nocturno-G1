@@ -29,7 +29,7 @@ app.use((req, res) => {
   res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
 });
 
-// Manejo centralizado de errores (los lanzan el servicio, el middleware de seguridad o el repositorio)
+// Manejo centralizado de errores (los lanzan el servicio o el repositorio)
 app.use((err, req, res, next) => {
   // JSON mal formado en el cuerpo de la petición
   if (err.type === 'entity.parse.failed') {
