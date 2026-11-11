@@ -1,128 +1,259 @@
 # ms-pedidos · AgroRed S.A.S.
 
-Microservicio de **pedidos** de la aplicación de AgroRed: gestiona los pedidos de los clientes: qué producto, cuánto y desde qué centro de distribución.
-Responsable: **Valeria Polanco Muñoz** · Puerto: **3004** · Base de datos propia: `pedidos_db` (MySQL).
+Microservicio de **pedidos** de AgroRed S.A.S. Gestiona los pedidos de los clientes: producto solicitado, cantidad, centro de distribución, estado y fecha.
 
-Construido con Node.js + Express en capas (rutas → controlador → servicio → repositorio → modelo). Versión del Taller 2: CRUD completo, filtros, persistencia en MySQL y seguridad con JWT, más las relaciones con ms-clientes y ms-productos.
+**Responsable:** Valeria Polanco Muñoz  
+**Puerto:** `3004`  
+**Base de datos propia:** `pedidos_db` (MySQL)
+
+Está construido con Node.js + Express usando arquitectura en capas:
+
+`rutas → controlador → servicio → repositorio → modelo`
+
+## Alcance actual · Taller 2, Semana 1
+
+En esta etapa el microservicio incluye:
+
+- API REST con CRUD completo.
+- Filtros por `estado` y `cliente_id`.
+- Validaciones y reglas de negocio.
+- Persistencia en MySQL.
+- Códigos de estado HTTP.
+- Colección de Postman con los casos de prueba de la Semana 1.
+- Contrato de las relaciones que se implementarán en la Semana 2.
+
+**Todavía no se implementan JWT, permisos por rol ni llamadas REST a otros microservicios.**
+
+---
 
 ## Cómo ejecutarlo
 
-Requisitos: Node.js 22.9 o superior y MySQL 8 (o MariaDB).
+### Requisitos
 
-**1. Crear la base de datos y su usuario** (una sola vez, conectado como `root` en MySQL Workbench o en la consola `mysql -u root -p`):
+- Node.js
+- MySQL 8 o compatible
+- npm
+
+### 1. Crear la base de datos y el usuario
+
+Ejecutar una sola vez como `root` en MySQL Workbench o consola:
 
 ```sql
 CREATE DATABASE pedidos_db;
 CREATE USER 'pedidos_user'@'localhost' IDENTIFIED BY 'una-clave-segura';
 GRANT ALL PRIVILEGES ON pedidos_db.* TO 'pedidos_user'@'localhost';
+FLUSH PRIVILEGES;
 ```
 
-**2. Crear la tabla y los registros iniciales** (desde la carpeta `ms-pedidos`):
+### 2. Crear la tabla y los registros iniciales
 
-```
+Desde la carpeta `ms-pedidos`:
+
+```text
 mysql -u pedidos_user -p pedidos_db
 mysql> SOURCE db/schema.sql;
 ```
 
-**3. Configurar e iniciar el servicio:**
+### 3. Configurar las variables de entorno
 
+Copiar:
+
+```text
+.env.example
 ```
+
+como:
+
+```text
+.env
+```
+
+y completar la contraseña local de MySQL.
+
+Variables utilizadas:
+
+| Variable | Ejemplo | Uso |
+|---|---|---|
+| `PORT` | `3004` | Puerto del microservicio |
+| `HOST` | `127.0.0.1` | Dirección donde escucha el servicio |
+| `DB_HOST` | `localhost` | Servidor MySQL |
+| `DB_PORT` | `3306` | Puerto MySQL |
+| `DB_NAME` | `pedidos_db` | Base de datos |
+| `DB_USER` | `pedidos_user` | Usuario de la base |
+| `DB_PASSWORD` | — | Contraseña local |
+
+El archivo `.env` **no se sube al repositorio**.
+
+### 4. Instalar dependencias y ejecutar
+
+```bash
 npm install
-copy .env.example .env      # en Linux/Mac: cp .env.example .env
 npm run dev
 ```
 
-Variables del `.env` (el archivo nunca se sube al repositorio):
+Verificación:
 
-| Variable | Ejemplo | Para qué |
-|---|---|---|
-| PORT | 3004 | Puerto del microservicio |
-| HOST | 127.0.0.1 | Solo acepta conexiones del mismo equipo |
-| DB_HOST / DB_PORT | localhost / 3306 | Dónde está MySQL (en el Taller 3: la IP de servidor1) |
-| DB_NAME / DB_USER / DB_PASSWORD | pedidos_db / pedidos_user / … | Base y usuario propios del microservicio |
-| JWT_SECRET | (frase del grupo) | La misma en todos los microservicios; verifica los tokens |
-| CLIENTES_URL | http://127.0.0.1:3003 | Dónde está ms-clientes |
-| PRODUCTOS_URL | http://127.0.0.1:3002 | Dónde está ms-productos |
-
-Verificar: `http://localhost:3004/health` responde `{"servicio":"ms-pedidos","estado":"ok"}`. Las demás rutas exigen un token de ms-usuarios.
-
-## Representación
-
-Así responde `GET /pedidos/2`:
-
-```json
-{ "id": 2, "cliente_id": 2, "producto_id": 2, "cantidad": 80, "centro_distribucion": "Bogotá", "estado": "recibido", "fecha": "2026-10-26",
-  "cliente": { "id": 2, "nombre": "Fruver La Sabana" },
-  "producto": { "id": 2, "nombre": "Tomate chonto", "precio": 3200 } }
+```text
+GET http://127.0.0.1:3004/health
 ```
 
-| Atributo | Tipo | ¿Obligatorio al crear? | Reglas |
-|---|---|---|---|
-| id | entero | No: lo asigna el servicio | Positivo y único |
-| cliente_id | entero | Sí | Debe existir en ms-clientes (400 si no; 503 si no responde) |
-| producto_id | entero | Sí | Debe existir en ms-productos (400 si no; 503 si no responde) |
-| cantidad | entero | Sí | Mayor que 0 |
-| centro_distribucion | texto | Sí | Bogotá o Cali |
-| estado | texto | Al crear no (siempre recibido); en PUT sí | recibido, despachado o entregado |
-| fecha | fecha AAAA-MM-DD | Al crear no (hoy); en PUT sí | Fecha válida |
+Respuesta esperada:
 
-**Regla de negocio:** Todo pedido nuevo empieza en estado recibido (400 si llega otro) y sin fecha se registra con la de hoy; un pedido ya entregado no se puede modificar (409). Además: cantidad entera > 0 y centro de distribución dentro de su lista (400).
+```json
+{
+  "servicio": "ms-pedidos",
+  "estado": "ok"
+}
+```
+
+---
+
+## Representación de un pedido
+
+Ejemplo de respuesta de `GET /pedidos/2`:
+
+```json
+{
+  "id": 2,
+  "cliente_id": 2,
+  "producto_id": 2,
+  "cantidad": 80,
+  "centro_distribucion": "Bogotá",
+  "estado": "recibido",
+  "fecha": "2026-10-26"
+}
+```
+
+| Atributo | Tipo | Obligatorio al crear | Reglas |
+|---|---|---:|---|
+| `id` | entero | No | Lo asigna MySQL |
+| `cliente_id` | entero | Sí | Entero positivo |
+| `producto_id` | entero | Sí | Entero positivo |
+| `cantidad` | entero | Sí | Entero mayor que 0 |
+| `centro_distribucion` | texto | Sí | `Bogotá` o `Cali` |
+| `estado` | texto | No | Al crear queda en `recibido`; valores permitidos: `recibido`, `despachado`, `entregado` |
+| `fecha` | `AAAA-MM-DD` | No | Si no se envía al crear, el servicio usa la fecha actual |
+
+En la Semana 1, `cliente_id` y `producto_id` se validan como enteros positivos. La comprobación de que esos registros existan en otros microservicios se implementará en la Semana 2.
+
+---
+
+## Reglas de negocio
+
+El microservicio aplica, entre otras, estas reglas:
+
+- `cantidad` debe ser un entero mayor que `0`.
+- `centro_distribucion` debe ser `Bogotá` o `Cali`.
+- Todo pedido nuevo debe comenzar en estado `recibido`.
+- Si no se envía `fecha` al crear, el servicio asigna la fecha actual.
+- Un pedido que ya está en estado `entregado` no puede modificarse; en ese caso se responde `409 Conflict`.
+
+---
 
 ## Endpoints
 
-Todas las rutas (salvo `/health`) exigen la cabecera `Authorization: Bearer <token>`.
-
-| Operación | Método | URI | Cuerpo | Respuesta exitosa | Errores posibles |
+| Operación | Método | URI | Cuerpo | Respuesta exitosa | Errores principales |
 |---|---|---|---|---|---|
-| Listar | GET | /pedidos | — | 200 + arreglo | 401 |
-| Filtrar | GET | /pedidos?estado=recibido | — | 200 + arreglo filtrado | 400 · 401 |
-| Obtener | GET | /pedidos/:id | — | 200 + objeto | 400 id inválido · 401 · 404 |
-| Crear | POST | /pedidos | JSON sin id | 201 + objeto + cabecera Location | 400 · 401 · 403 · 503 |
-| Actualizar | PUT | /pedidos/:id | JSON completo sin id | 200 + objeto actualizado | 400 · 401 · 403 · 404 · 409 · 503 |
-| Eliminar | DELETE | /pedidos/:id | — | 204 sin cuerpo | 400 · 401 · 403 · 404 |
+| Listar | GET | `/pedidos` | — | `200` + arreglo | — |
+| Filtrar por estado | GET | `/pedidos?estado=recibido` | — | `200` + arreglo | — |
+| Filtrar por cliente | GET | `/pedidos?cliente_id=2` | — | `200` + arreglo | `400` si el id es inválido |
+| Obtener | GET | `/pedidos/:id` | — | `200` + objeto | `400`, `404` |
+| Crear | POST | `/pedidos` | JSON sin `id` | `201` + objeto + `Location` | `400` |
+| Actualizar | PUT | `/pedidos/:id` | JSON completo sin `id` | `200` + objeto actualizado | `400`, `404`, `409` |
+| Eliminar | DELETE | `/pedidos/:id` | — | `204` sin cuerpo | `400`, `404` |
 
-Ejemplo · crear:
+### Ejemplo de creación
 
-```
+```http
 POST /pedidos
-Authorization: Bearer <token>
 Content-Type: application/json
-
-{ "cliente_id": 1, "producto_id": 2, "cantidad": 50, "centro_distribucion": "Cali" }
-
-→ 201 Created · Location: /pedidos/4
-{ "id": 4, "cliente_id": 1, "producto_id": 2, "cantidad": 50, "centro_distribucion": "Cali", "estado": "recibido", "fecha": "2026-11-03",
-  "cliente": { "id": 1, "nombre": "Distribuidora El Valle" }, "producto": { "id": 2, "nombre": "Tomate chonto", "precio": 3200 } }
 ```
 
-Ejemplo · listar con filtro:
-
+```json
+{
+  "cliente_id": 1,
+  "producto_id": 2,
+  "cantidad": 50,
+  "centro_distribucion": "Cali"
+}
 ```
+
+Respuesta esperada:
+
+```text
+201 Created
+Location: /pedidos/<id>
+```
+
+El pedido creado queda con estado `recibido`.
+
+### Ejemplo de filtro
+
+```text
 GET /pedidos?estado=recibido
-→ 200 OK · arreglo con los registros que cumplen el filtro
 ```
 
-Errores: siempre `{"error": "...", "detalles": [...]}` (detalles solo en validación).
+Devuelve un arreglo con los pedidos cuyo estado sea `recibido`.
 
-## Seguridad
+---
 
-| Entidad | Consultan (GET) | Crean, modifican y eliminan |
-|---|---|---|
-| Pedidos | administrador, comercial, produccion | administrador, comercial |
+## Persistencia
 
-Sin token o con un token inválido: 401. Con un rol sin permiso: 403.
+Los datos se almacenan en MySQL mediante el repositorio:
 
-## Relaciones
+```text
+src/repositories/pedidos.repository.js
+```
 
-ms-pedidos **guarda las referencias** y consulta a los otros dos microservicios, reenviando el token del usuario:
+La tabla se crea con:
 
-| Atributo | Microservicio consultado | Para validar (al crear y actualizar) | Para componer (al consultar) | Datos que usa |
+```text
+db/schema.sql
+```
+
+`cliente_id` y `producto_id` son columnas enteras normales y **no tienen llaves foráneas hacia otros microservicios**, porque cada microservicio es dueño de su propia base de datos.
+
+---
+
+## Relaciones · contrato para la Semana 2
+
+`ms-pedidos` guarda las referencias `cliente_id` y `producto_id`.
+
+La implementación de estas relaciones se realizará en la Semana 2. El contrato previsto es:
+
+| Atributo | Microservicio a consultar | Validación futura | Composición futura | Datos requeridos |
 |---|---|---|---|---|
-| cliente_id | ms-clientes | GET /clientes/:id | GET /clientes?ids=… | id, nombre |
-| producto_id | ms-productos | GET /productos/:id | GET /productos?ids=… | id, nombre, precio |
+| `cliente_id` | `ms-clientes` | `GET /clientes/:id` | `GET /clientes?ids=...` | `id`, `nombre` |
+| `producto_id` | `ms-productos` | `GET /productos/:id` | `GET /productos?ids=...` | `id`, `nombre`, `precio` |
 
-Si la referencia no existe: 400. Si el otro microservicio no responde al escribir: 503; al leer, la respuesta sale con el objeto en `null` y un `aviso` (degradación controlada). Para un listado se hace **una sola** consulta por lotes a cada microservicio. El código está en `src/clients/`.
+En la Semana 1 estas llamadas REST **todavía no están implementadas**.
 
-## Pruebas
+---
 
-Colección de Postman en `docs/ms-pedidos.postman_collection.json` (Import en Postman). Ejecute primero la carpeta 0 (inicio de sesión) con ms-usuarios corriendo.
+## Pruebas con Postman
+
+Colección:
+
+```text
+docs/ms-pedidos.postman_collection.json
+```
+
+La colección corresponde a la **Semana 1** y no requiere autenticación.
+
+Incluye:
+
+1. Listar todos → `200`
+2. Filtrar por estado → `200`
+3. Consulta por lotes `?ids=` → **no aplica a ms-pedidos**
+4. Obtener un registro existente → `200`
+5. Obtener un id inexistente → `404`
+6. Obtener con id no numérico → `400`
+7. Crear con datos válidos → `201`
+8. Crear con datos inválidos → `400`
+9. Crear violando la regla de negocio → `400`
+10. Actualizar un registro existente → `200`
+11. Actualizar un id inexistente → `404`
+12. Eliminar un registro existente → `204`
+13. Eliminar el mismo registro nuevamente → `404`
+
+La seguridad JWT, los permisos por rol y las pruebas de relaciones se incorporarán en la Semana 2.

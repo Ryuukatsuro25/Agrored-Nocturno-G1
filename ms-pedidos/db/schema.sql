@@ -3,8 +3,10 @@
 --   mysql -u pedidos_user -p pedidos_db
 --   mysql> SOURCE db/schema.sql;
 -- cliente_id y producto_id son enteros normales SIN FOREIGN KEY: los clientes y
--- los productos viven en otras bases de datos, de otros microservicios. Que existan
--- lo valida ms-pedidos consultando a ms-clientes y ms-productos por REST.
+-- los productos viven en otras bases de datos, de otros microservicios.
+-- En la Semana 1 se validan como enteros positivos; su existencia se validará
+-- por REST en la Semana 2.
+
 SET NAMES utf8mb4;            -- para que las tildes y la ñ se guarden bien
 
 DROP TABLE IF EXISTS pedidos;
