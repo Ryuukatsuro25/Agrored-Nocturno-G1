@@ -1,7 +1,6 @@
 // =====================================================================
 // CAPA DE PRESENTACIÓN (controlador)
-// Traduce HTTP <-> servicio: lee la petición (params, body),
-// llama al servicio y arma la respuesta (código de estado + JSON).
+// Traduce HTTP <-> servicio: lee la petición y arma la respuesta.
 // =====================================================================
 const service = require('../services/usuarios.service');
 const HttpError = require('../utils/http-error');
@@ -12,23 +11,21 @@ function leerId(req) {
   return id;
 }
 
-// GET /usuarios, GET /usuarios?rol=despacho, GET /usuarios?ids=1,3
+// GET /usuarios, GET /usuarios?rol=despacho, GET /usuarios?ids=1,2,3
 async function listar(req, res) {
   const filtros = { rol: req.query.rol };
-  if (req.query.ids) {                    // ?ids=1,3 → [1, 3]
+  if (req.query.ids) {
     filtros.ids = String(req.query.ids).split(',').map(Number);
     if (filtros.ids.some((id) => !Number.isInteger(id) || id <= 0)) {
       throw new HttpError(400, 'ids debe ser una lista de enteros separados por comas');
     }
   }
-  const usuarios = await service.listar(filtros);
-  res.status(200).json(usuarios);
+  res.status(200).json(await service.listar(filtros));
 }
 
 // GET /usuarios/:id
 async function obtener(req, res) {
-  const usuario = await service.obtener(leerId(req));
-  res.status(200).json(usuario);
+  res.status(200).json(await service.obtener(leerId(req)));
 }
 
 // POST /usuarios
@@ -39,14 +36,23 @@ async function crear(req, res) {
 
 // PUT /usuarios/:id
 async function actualizar(req, res) {
-  const actualizado = await service.actualizar(leerId(req), req.body);
-  res.status(200).json(actualizado);
+  res.status(200).json(await service.actualizar(leerId(req), req.body));
 }
 
 // DELETE /usuarios/:id
 async function eliminar(req, res) {
   await service.eliminar(leerId(req));
-  res.status(204).end();                  // 204 No Content: éxito, sin cuerpo
+  res.status(204).end();
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+// POST /usuarios/login
+async function login(req, res) {
+  res.status(200).json(await service.login(req.body));
+}
+
+// GET /usuarios/me — los datos del usuario dueño del token
+async function miPerfil(req, res) {
+  res.status(200).json(await service.obtener(req.usuario.id));
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, login, miPerfil };

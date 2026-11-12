@@ -1,14 +1,17 @@
 {
   "name": "ms-usuarios",
   "version": "1.0.0",
-  "description": "Microservicio de usuarios (plantilla del Taller 1) - Redes y Servicios Multimedia, Módulo 3",
+  "description": "Microservicio de usuarios: inicio de sesión y tokens JWT (versión completa) - Redes y Servicios Multimedia, Módulo 3",
   "main": "src/index.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env src/index.js",
     "dev": "node --watch --env-file-if-exists=.env src/index.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.24.6"
   }
 }

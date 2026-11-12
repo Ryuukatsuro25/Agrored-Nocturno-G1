@@ -2,9 +2,6 @@
 // CAPA DE MODELO (entidad)
 // Define qué campos tiene un Usuario y qué reglas deben cumplir.
 // No sabe nada de HTTP ni de bases de datos.
-//
-// Versión del Taller 1: todavía sin contraseña. La contraseña cifrada
-// y el inicio de sesión se agregan en la versión completa (Taller 3).
 // =====================================================================
 
 // Los roles válidos vienen del archivo .env (cada empresa tiene los suyos)
@@ -16,9 +13,11 @@ function rolesValidos() {
 }
 
 const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LONGITUD_MINIMA_PASSWORD = 8;
 
-// Devuelve una lista de errores de validación (vacía si todo está bien)
-function validarUsuario(datos) {
+// Devuelve una lista de errores de validación (vacía si todo está bien).
+// passwordObligatoria: true al crear; al actualizar la contraseña es opcional.
+function validarUsuario(datos, { passwordObligatoria }) {
   const errores = [];
   if (!datos || typeof datos !== 'object') {
     return ['Se esperaba un objeto JSON con los datos del usuario'];
@@ -36,10 +35,15 @@ function validarUsuario(datos) {
   if (datos.activo !== undefined && typeof datos.activo !== 'boolean') {
     errores.push('activo debe ser true o false');
   }
+  const hayPassword = datos.password !== undefined;
+  if ((passwordObligatoria || hayPassword) &&
+      (typeof datos.password !== 'string' || datos.password.length < LONGITUD_MINIMA_PASSWORD)) {
+    errores.push(`password es obligatoria y debe tener al menos ${LONGITUD_MINIMA_PASSWORD} caracteres`);
+  }
   return errores;
 }
 
-// Construye un usuario "limpio" solo con los campos permitidos
+// Construye un usuario "limpio" solo con los campos permitidos (sin la contraseña)
 function construirUsuario(datos) {
   return {
     nombre: datos.nombre.trim(),
