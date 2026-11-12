@@ -37,7 +37,10 @@ async function obtener(req, res) {
 }
 
 async function crear(req, res) {
-  const nuevo = await service.crear(req.body);
+  const nuevo = await service.crear(
+    req.body,
+    req.headers.authorization
+  );
 
   res
     .status(201)
@@ -46,7 +49,12 @@ async function crear(req, res) {
 }
 
 async function actualizar(req, res) {
-  const pedido = await service.actualizar(leerId(req), req.body);
+  const pedido = await service.actualizar(
+    leerId(req),
+    req.body,
+    req.headers.authorization
+  );
+
   res.status(200).json(pedido);
 }
 

@@ -1,5 +1,7 @@
 const repo = require('../repositories/pedidos.repository');
 const { validarPedido, construirPedido } = require('../models/pedido');
+const clientesClient = require('../clients/clientes.client');
+const productosClient = require('../clients/productos.client');
 const HttpError = require('../utils/http-error');
 
 function fechaDeHoy() {
@@ -26,7 +28,39 @@ async function obtener(id) {
   return buscar(id);
 }
 
-async function crear(datos) {
+// Valida las referencias externas del pedido.
+// Solo consulta una referencia cuando viene incluida en los datos.
+async function validarReferencias(datos, token) {
+  if (datos.cliente_id !== undefined) {
+    const existeCliente = await clientesClient.existeCliente(
+      datos.cliente_id,
+      token
+    );
+
+    if (!existeCliente) {
+      throw new HttpError(
+        400,
+        `No existe el cliente con id ${datos.cliente_id}`
+      );
+    }
+  }
+
+  if (datos.producto_id !== undefined) {
+    const existeProducto = await productosClient.existeProducto(
+      datos.producto_id,
+      token
+    );
+
+    if (!existeProducto) {
+      throw new HttpError(
+        400,
+        `No existe el producto con id ${datos.producto_id}`
+      );
+    }
+  }
+}
+
+async function crear(datos, token) {
   const errores = validarPedido(datos);
 
   if (errores.length > 0) {
@@ -42,6 +76,10 @@ async function crear(datos) {
     );
   }
 
+  // Semana 2:
+  // cliente_id y producto_id deben existir en sus microservicios.
+  await validarReferencias(datos, token);
+
   const pedido = construirPedido(datos);
 
   if (!pedido.fecha) {
@@ -51,7 +89,7 @@ async function crear(datos) {
   return repo.create(pedido);
 }
 
-async function actualizar(id, datos) {
+async function actualizar(id, datos, token) {
   const actual = await buscar(id);
 
   const errores = validarPedido(datos, {
@@ -70,6 +108,10 @@ async function actualizar(id, datos) {
       `El pedido ${id} ya fue entregado y no se puede modificar`
     );
   }
+
+  // En una actualización solo se validan las referencias
+  // que realmente fueron enviadas.
+  await validarReferencias(datos, token);
 
   const pedido = construirPedido(datos);
 
