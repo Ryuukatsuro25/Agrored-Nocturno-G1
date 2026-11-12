@@ -1,18 +1,21 @@
 // =====================================================================
-// CAPA DE PRESENTACIÓN (rutas) · Taller 2, semana 1
-// Asocia cada método HTTP + URI con una función del controlador.
-// La autenticación JWT se incorporará en la semana 2 cuando la docente
-// entregue la versión de ms-usuarios con auth.js.
+// CAPA DE PRESENTACIÓN (rutas) · Taller 2, semana 2
+// Todas las rutas del recurso exigen un JWT válido.
+// GET: cualquier usuario autenticado.
+// POST/PUT/DELETE: solo los roles definidos en la tabla de permisos.
 // =====================================================================
 const { Router } = require('express');
 const controller = require('../controllers/productos.controller');
+const { verificarToken, requiereRol } = require('../middlewares/auth');
 
 const router = Router();
 
-router.get('/', controller.listar);              // listar, filtrar, ?ids=
-router.get('/:id', controller.obtener);          // obtener por id
-router.post('/', controller.crear);              // crear
-router.put('/:id', controller.actualizar);       // actualizar
-router.delete('/:id', controller.eliminar);      // eliminar
+router.use(verificarToken);
+
+router.get('/', controller.listar);
+router.get('/:id', controller.obtener);
+router.post('/', requiereRol('administrador', 'produccion'), controller.crear);
+router.put('/:id', requiereRol('administrador', 'produccion'), controller.actualizar);
+router.delete('/:id', requiereRol('administrador', 'produccion'), controller.eliminar);
 
 module.exports = router;
