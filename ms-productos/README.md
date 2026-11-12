@@ -1,15 +1,15 @@
 # ms-productos · AgroRed S.A.S.
 
-Microservicio de **productos** de AgroRed: gestiona los productos que la empresa fabrica o comercializa.
+Microservicio de **productos** de la aplicación de AgroRed: gestiona los productos que AgroRed fabrica o comercializa.
 Responsable: **Juan Pablo Rueda Sánchez** · Puerto: **3002** · Base de datos propia: `productos_db` (MySQL).
 
-Construido con Node.js + Express en capas (rutas → controlador → servicio → repositorio → modelo). Estado de **Taller 2 · semana 1**: CRUD completo, filtros, regla de negocio, persistencia en MySQL, contrato y colección de Postman. La seguridad JWT se incorporará en la semana 2 con el `auth.js` entregado por la docente.
+Construido con Node.js + Express en capas (rutas → controlador → servicio → repositorio → modelo). El archivo `src/middlewares/auth.js` es una copia **sin cambios** del entregado por la docente en `ms-usuarios`. Versión del Taller 2: CRUD completo, filtros, persistencia en MySQL y seguridad con JWT.
 
 ## Cómo ejecutarlo
 
 Requisitos: Node.js 22.9 o superior y MySQL 8 (o MariaDB).
 
-**1. Crear la base de datos y su usuario** (una sola vez, conectado como `root`):
+**1. Crear la base de datos y su usuario** (una sola vez, conectado como `root` en MySQL Workbench o en la consola `mysql -u root -p`):
 
 ```sql
 CREATE DATABASE productos_db;
@@ -17,35 +17,36 @@ CREATE USER 'productos_user'@'localhost' IDENTIFIED BY 'una-clave-segura';
 GRANT ALL PRIVILEGES ON productos_db.* TO 'productos_user'@'localhost';
 ```
 
-**2. Crear la tabla y los registros iniciales** desde `ms-productos`:
+**2. Crear la tabla y los registros iniciales** (desde la carpeta `ms-productos`):
 
-```text
+```
 mysql -u productos_user -p productos_db
 mysql> SOURCE db/schema.sql;
 ```
 
 **3. Configurar e iniciar el servicio:**
 
-```text
+```
 npm install
-copy .env.example .env
+copy .env.example .env      # en Linux/Mac: cp .env.example .env
 npm run dev
 ```
 
-Variables del `.env`:
+Variables del `.env` (el archivo nunca se sube al repositorio):
 
 | Variable | Ejemplo | Para qué |
 |---|---|---|
 | PORT | 3002 | Puerto del microservicio |
-| HOST | 127.0.0.1 | Dirección local del servicio |
-| DB_HOST / DB_PORT | localhost / 3306 | Dirección y puerto de MySQL |
+| HOST | 127.0.0.1 | Solo acepta conexiones del mismo equipo |
+| DB_HOST / DB_PORT | localhost / 3306 | Dónde está MySQL (en el Taller 3: la IP de servidor1) |
 | DB_NAME / DB_USER / DB_PASSWORD | productos_db / productos_user / … | Base y usuario propios del microservicio |
+| JWT_SECRET | (frase del grupo) | La misma en todos los microservicios; verifica los tokens |
 
-Verificación: `GET http://localhost:3002/health` debe responder `200` con `{"servicio":"ms-productos","estado":"ok"}`.
+Verificar: `http://localhost:3002/health` responde `{"servicio":"ms-productos","estado":"ok"}`. Las demás rutas exigen un token de ms-usuarios.
 
 ## Representación
 
-Ejemplo de `GET /productos/2`:
+Así responde `GET /productos/2`:
 
 ```json
 { "id": 2, "nombre": "Tomate chonto", "categoria": "hortaliza", "unidad": "kg", "precio": 3200 }
@@ -53,49 +54,68 @@ Ejemplo de `GET /productos/2`:
 
 | Atributo | Tipo | ¿Obligatorio al crear? | Reglas |
 |---|---|---|---|
-| id | entero | No | Lo asigna MySQL; positivo y único |
-| nombre | texto | Sí | No vacío; único sin distinguir mayúsculas |
-| categoria | texto | Sí | `fruta`, `hortaliza` o `procesado` |
-| unidad | texto | Sí | `kg` o `caja` |
-| precio | número | Sí | Mayor que 0 |
+| id | entero | No: lo asigna el servicio | Positivo y único |
+| nombre | texto | Sí | No vacío; único sin distinguir mayúsculas (409) |
+| categoria | texto | Sí | fruta, hortaliza o procesado |
+| unidad | texto | Sí | kg o caja |
+| precio | número | Sí | Mayor que 0, pesos por unidad |
 
-**Regla de negocio:** no puede haber dos productos con el mismo nombre, sin distinguir mayúsculas. La API responde `409 Conflict`. Las demás validaciones inválidas responden `400`.
+**Regla de negocio:** No puede haber dos productos con el mismo nombre, sin distinguir mayúsculas (409). Además: precio > 0 y categoría y unidad dentro de su lista (400).
 
 ## Endpoints
 
+Todas las rutas (salvo `/health`) exigen la cabecera `Authorization: Bearer <token>`.
+
 | Operación | Método | URI | Cuerpo | Respuesta exitosa | Errores posibles |
 |---|---|---|---|---|---|
-| Listar | GET | `/productos` | — | 200 + arreglo | — |
-| Filtrar | GET | `/productos?categoria=fruta` | — | 200 + arreglo filtrado | — |
-| Consultar por lotes | GET | `/productos?ids=1,3,8` | — | 200 + arreglo | 400 ids inválidos |
-| Obtener | GET | `/productos/:id` | — | 200 + objeto | 400 id inválido · 404 |
-| Crear | POST | `/productos` | JSON sin id | 201 + objeto + `Location` | 400 · 409 |
-| Actualizar | PUT | `/productos/:id` | JSON completo sin id | 200 + objeto | 400 · 404 · 409 |
-| Eliminar | DELETE | `/productos/:id` | — | 204 sin cuerpo | 400 · 404 |
+| Listar | GET | /productos | — | 200 + arreglo | 401 |
+| Filtrar | GET | /productos?categoria=fruta | — | 200 + arreglo filtrado | 400 · 401 |
+| Consultar por lotes | GET | /productos?ids=1,3,8 | — | 200 + arreglo con esos registros | 400 ids inválidos · 401 |
+| Obtener | GET | /productos/:id | — | 200 + objeto | 400 id inválido · 401 · 404 |
+| Crear | POST | /productos | JSON sin id | 201 + objeto + cabecera Location | 400 · 401 · 403 · 409 nombre repetido |
+| Actualizar | PUT | /productos/:id | JSON completo sin id | 200 + objeto actualizado | 400 · 401 · 403 · 404 · 409 |
+| Eliminar | DELETE | /productos/:id | — | 204 sin cuerpo | 400 · 401 · 403 · 404 |
 
-Ejemplo de creación:
+Ejemplo · crear:
 
-```http
+```
 POST /productos
+Authorization: Bearer <token>
 Content-Type: application/json
-```
 
-```json
 { "nombre": "Aguacate Hass", "categoria": "fruta", "unidad": "kg", "precio": 9800 }
+
+→ 201 Created · Location: /productos/4
+{ "id": 4, "nombre": "Aguacate Hass", "categoria": "fruta", "unidad": "kg", "precio": 9800 }
 ```
 
-Respuesta esperada: `201 Created` y cabecera `Location`.
+Ejemplo · listar con filtro:
 
-## Relaciones · contrato para la semana 2
+```
+GET /productos?categoria=fruta
+→ 200 OK · arreglo con los registros que cumplen el filtro
+```
 
-`ms-productos` no guarda referencias a otros microservicios. En la integración de la semana 2 será consultado por `ms-pedidos`:
+Errores: siempre `{"error": "...", "detalles": [...]}` (detalles solo en validación).
 
-| Me consulta | Peticiones acordadas | Campos del contrato |
+## Seguridad
+
+| Entidad | Consultan (GET) | Crean, modifican y eliminan |
 |---|---|---|
-| ms-pedidos | `GET /productos/:id` · `GET /productos?ids=…` | id, nombre, precio |
+| Productos | administrador, comercial, produccion | administrador, produccion |
 
-Por eso el filtro `?ids=` ya queda disponible al finalizar la semana 1. La autenticación y la integración efectiva se incorporarán en la semana 2.
+Sin token o con un token inválido: 401. Con un rol sin permiso: 403.
+
+## Relaciones
+
+ms-productos no guarda referencias. **Es consultado** por ms-pedidos:
+
+| Me consulta | Peticiones que me hace | Campos que no puedo cambiar sin avisar |
+|---|---|---|
+| ms-pedidos | GET /productos/:id · GET /productos?ids=… | id, nombre, precio |
+
+Por eso el filtro `?ids=` es parte de este contrato. Cada petición que llega se registra en la terminal del servicio.
 
 ## Pruebas
 
-Importe `docs/ms-productos.postman_collection.json`. La colección de esta entrega contiene los **casos 1 a 13** del CRUD y **no requiere token** ni ejecutar `ms-usuarios`.
+Colección de Postman en `docs/ms-productos.postman_collection.json` (Import en Postman). Ejecute primero la carpeta 0 (inicio de sesión) con ms-usuarios corriendo.
