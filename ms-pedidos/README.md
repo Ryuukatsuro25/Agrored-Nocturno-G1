@@ -215,20 +215,27 @@ db/schema.sql
 
 ---
 
-## Relaciones · contrato para la Semana 2
+## Relaciones · Semana 2
 
 `ms-pedidos` guarda las referencias `cliente_id` y `producto_id`.
 
-La implementación de estas relaciones se realizará en la Semana 2. El contrato previsto es:
+Al crear o actualizar un pedido, el servicio verifica por REST que el cliente
+y el producto existan. Al consultar pedidos, obtiene los datos relacionados
+mediante consultas por lotes `?ids=` y agrega los objetos `cliente` y
+`producto` a la respuesta.
 
-| Atributo | Microservicio a consultar | Validación futura | Composición futura | Datos requeridos |
+| Atributo | Microservicio consultado | Para validar | Para componer | Datos usados |
 |---|---|---|---|---|
 | `cliente_id` | `ms-clientes` | `GET /clientes/:id` | `GET /clientes?ids=...` | `id`, `nombre` |
 | `producto_id` | `ms-productos` | `GET /productos/:id` | `GET /productos?ids=...` | `id`, `nombre`, `precio` |
 
-En la Semana 1 estas llamadas REST **todavía no están implementadas**.
+### Manejo de errores en las relaciones
 
----
+- Si una referencia no existe al crear o actualizar, se responde `400 Bad Request`.
+- Si el microservicio relacionado no responde durante una escritura, se responde `503 Service Unavailable`.
+- Si un servicio relacionado no responde durante una consulta, el pedido se devuelve con el objeto correspondiente en `null` y un campo `aviso`.
+- Para listar pedidos se realiza una sola consulta `?ids=` por cada microservicio relacionado, evitando una petición por cada pedido.
+- El token recibido por `ms-pedidos` se reenvía a `ms-clientes` y `ms-productos`.
 
 ## Pruebas con Postman
 
