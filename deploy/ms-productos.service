@@ -1,0 +1,14 @@
+[Unit]
+Description=Microservicio productos - AgroRed
+After=network.target
+
+[Service]
+User=nodeapps
+Group=nodeapps
+WorkingDirectory=/srv/agrored/app/ms-productos
+ExecStart=/usr/bin/node --env-file=.env src/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
