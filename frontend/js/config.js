@@ -5,8 +5,8 @@
 //   DATOS_DE_EJEMPLO = false → las pantallas llaman a la API real por el gateway Apache
 // =====================================================================
 export const CONFIG = {
-  DATOS_DE_EJEMPLO: true,
-  API_URL: 'http://app.agrored.com/api',   // Apache reenvía /api/<recurso> a cada microservicio
+  DATOS_DE_EJEMPLO: false,
+  API_URL: '/api',   // Apache reenvía /api/<recurso> a cada microservicio
   EMPRESA: 'AgroRed S.A.S.',
   FILAS_POR_PAGINA: 8,
 };
