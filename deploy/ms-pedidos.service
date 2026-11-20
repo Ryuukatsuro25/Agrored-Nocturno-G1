@@ -1,0 +1,15 @@
+﻿[Unit]
+Description=Microservicio pedidos - AgroRed
+After=network.target
+
+[Service]
+Type=simple
+User=nodeapps
+Group=nodeapps
+WorkingDirectory=/srv/agrored/app/ms-pedidos
+ExecStart=/usr/bin/node --env-file=/srv/agrored/app/ms-pedidos/.env src/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
