@@ -1,6 +1,6 @@
-﻿[Unit]
+[Unit]
 Description=Microservicio pedidos - AgroRed
-After=network.target
+After=network.target ms-clientes.service ms-productos.service
 
 [Service]
 Type=simple

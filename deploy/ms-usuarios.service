@@ -1,0 +1,13 @@
+[Unit]
+Description=Microservicio usuarios - AgroRed
+After=network.target
+
+[Service]
+User=nodeapps
+Group=nodeapps
+WorkingDirectory=/srv/agrored/app/ms-usuarios
+ExecStart=/usr/bin/node --env-file=.env src/index.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
